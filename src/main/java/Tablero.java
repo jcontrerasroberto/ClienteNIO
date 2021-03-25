@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.Locale;
 
 public class Tablero extends JFrame {
@@ -19,6 +20,7 @@ public class Tablero extends JFrame {
     private JPanel table, info;
     private String[][] matrix = new String[rows][columns];
     private JButton[][] buttons = new JButton[rows][columns];
+    private ArrayList<String> actualWords = new ArrayList<String>();
     private JComboBox<String> comboCategories = new JComboBox<String>();
     private String category;
 
@@ -107,8 +109,38 @@ public class Tablero extends JFrame {
     private void changeCategory(String sel) throws IOException, ClassNotFoundException {
         sendMessage("category:" + sel.toLowerCase(Locale.ROOT));
         category = sel.toLowerCase(Locale.ROOT);
-        matrix = (String[][]) ois.readObject();
+        AlphabetSoup temp = (AlphabetSoup) ois.readObject();
+        String[][] matrixrec = (String[][]) ois.readObject();
+        String linealMat = ois.readUTF();
+        //String matrix2 = ois.readUTF();
+        System.out.println(temp.getActualWords());
+        //System.out.println(matrix2);
+        matrix = temp.getMatrix().clone();
+        //System.out.println(temp.getMatrix().clone().toString());
+        printMatrix(matrixrec);
+        System.out.println(linealMat);
+        fillMatrix(linealMat);
         fillTablero();
+    }
+
+    public void fillMatrix(String lineal){
+        int cont=0;
+        for(int x=0; x<rows; x++){
+            for (int y=0; y<columns; y++){
+                matrix[x][y] = String.valueOf(lineal.charAt(cont));
+                cont++;
+            }
+        }
+    }
+
+    public void printMatrix(String[][] rec){
+        for(int x=0; x<rows; x++){
+            for (int y=0; y<columns; y++){
+                System.out.print(rec[x][y] + "\t");
+            }
+            System.out.println();
+        }
+        System.out.println();
     }
 
     public void sendMessage(String toSend) throws IOException {
