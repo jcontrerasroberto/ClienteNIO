@@ -1,3 +1,6 @@
+import org.apache.commons.lang3.StringUtils;
+import org.w3c.dom.css.RGBColor;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -7,6 +10,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Locale;
 
 public class Tablero extends JFrame {
@@ -24,6 +29,9 @@ public class Tablero extends JFrame {
     private ArrayList<JLabel> wordsLabel = new ArrayList<JLabel>();
     private JComboBox<String> comboCategories = new JComboBox<String>();
     private String category;
+    private String tryWord;
+    private ArrayList<JButton> selectedButtons  = new ArrayList<JButton>();
+    private Integer pendienteok;
 
     public Tablero() throws IOException, ClassNotFoundException {
 
@@ -58,14 +66,184 @@ public class Tablero extends JFrame {
                 buttons[x][y].setMargin(new Insets(0,0,0,0));
                 buttons[x][y].setBackground(Color.WHITE);
                 buttons[x][y].setPreferredSize(new Dimension(30, 30));
+                buttons[x][y].putClientProperty("xpos", y);
+                buttons[x][y].putClientProperty("ypos", x);
+                buttons[x][y].putClientProperty("result", false);
                 buttons[x][y].addActionListener(new ActionListener() {
                     @Override
                     public void actionPerformed(ActionEvent actionEvent) {
                         System.out.println(actionEvent.getActionCommand());
+                        JButton actioner = (JButton) actionEvent.getSource();
+                        if(!selectedButtons.contains(actioner)){
+                            selectedButtons.add(actioner);
+                            actioner.setBackground(Color.YELLOW);
+                            System.out.println(actioner.getClientProperty("xpos") + " . " + actioner.getClientProperty("ypos"));
+                        }else{
+                            selectedButtons.remove(actioner);
+                            actioner.setBackground(Color.WHITE);
+                            if((boolean) actioner.getClientProperty("result")){
+                                actioner.setBackground(Color.GREEN);
+                            }
+                        }
+                        if (checkIfOk()){
+                            System.out.println("Checar si es alguna palabra");
+                            String word = getWordInOrder();
+                            if(actualWords.contains(word.toLowerCase(Locale.ROOT)) || actualWords.contains(StringUtils.reverse(word.toLowerCase(Locale.ROOT)))){
+                                System.out.println("Encontraste la palabra :  " + word);
+                                disableButtons();
+                                markInPanel(word);
+                            }
+                        }
                     }
                 });
                 table.add(buttons[x][y]);
             }
+        }
+    }
+
+    public void markInPanel(String word){
+        for (JLabel tlabel : wordsLabel){
+            System.out.println("Palabra del label :  " + tlabel.getText());
+            if(tlabel.getText().equals(word.toUpperCase(Locale.ROOT)) || tlabel.getText().equals(StringUtils.reverse(word).toUpperCase(Locale.ROOT))) tlabel.setForeground(Color.RED);
+        }
+    }
+
+
+    public void disableButtons(){
+        for (int i = 0; i < selectedButtons.size(); i++){
+            selectedButtons.get(i).setBackground(Color.GREEN);
+            selectedButtons.get(i).putClientProperty("result", true);
+            //selectedButtons.get(i).setEnabled(false);
+        }
+        selectedButtons.clear();
+    }
+
+    public String getWordInOrder(){
+        String word = "";
+        ArrayList<Letter> arrLetras = new ArrayList<Letter>();
+        for(JButton sel : selectedButtons){
+            Letter temp = new Letter((int) sel.getClientProperty("xpos"), (int) sel.getClientProperty("ypos"), sel.getText());
+            arrLetras.add(temp);
+        }
+        if(pendienteok==0){
+            System.out.println("Ordenando en base a x");
+            Collections.sort(arrLetras, Letter.xposOrder);
+        }
+        if(pendienteok==180){
+            System.out.println("Ordenando en base a y");
+            Collections.sort(arrLetras, Letter. yposOrder);
+        }
+        if(pendienteok==45 || pendienteok==-45){
+            System.out.println("Ordenando en base a y o x, no importa");
+            Collections.sort(arrLetras, Letter. xposOrder);
+        }
+
+        for(Letter tl : arrLetras){
+            word = word + tl.getValue();
+        }
+
+        return word;
+
+    }
+
+    public boolean checkIfOk(){
+        ArrayList<Integer> pendientes = new ArrayList<Integer>();
+        for (int i = 0; i<selectedButtons.size()-1; i++) {
+            int restax = ((int) selectedButtons.get(i+1).getClientProperty("xpos") - (int)selectedButtons.get(i).getClientProperty("xpos"));
+            if(restax==0){
+                pendientes.add(180);
+            }else{
+                int pendientetemp = ((int) selectedButtons.get(i+1).getClientProperty("ypos") - (int)selectedButtons.get(i).getClientProperty("ypos")) / restax;
+                System.out.println("La pend de este punto es :  " + pendientetemp);
+                if (pendientetemp==1) pendientes.add(45);
+                if (pendientetemp==0) pendientes.add(0);
+                if (pendientetemp==-1) pendientes.add(-45);
+            }
+        }
+        if(pendientes.size()==0) return false;
+
+        boolean samePend = true;
+        int inicial = pendientes.get(0);
+        for (int p: pendientes){
+            System.out.println(p + " == " + inicial);
+            if (p==inicial) samePend=true;
+            else{
+                samePend=false;
+                break;
+            }
+        }
+
+        if(samePend){
+            System.out.println("Misma pendiente: " + inicial);
+            if (checkOrder(inicial)){
+                System.out.println("Estan posicionados");
+                pendienteok = inicial;
+                return true;
+            }else{
+                System.out.println("NO estan posicionados");
+                return false;
+            }
+        }else{
+            System.out.println("Diferente pendiente");
+            return false;
+        }
+    }
+
+    public boolean checkOrder(Integer pendiente){
+        boolean positioned = true;
+        if (pendiente==0){
+            ArrayList<Integer> xposs = new ArrayList<Integer>();
+            for(JButton t: selectedButtons){
+                xposs.add((int) t.getClientProperty("xpos"));
+            }
+            if(xposs.size()==0) return false;
+            Collections.sort(xposs);
+            for (int i = 0; i<xposs.size()-1; i++){
+                if(xposs.get(i) == xposs.get(i+1) - 1) positioned=true;
+                else{
+                    positioned=false;
+                    break;
+                }
+            }
+            return positioned;
+        }
+        if(pendiente==180){
+            ArrayList<Integer> yposs = new ArrayList<Integer>();
+            for(JButton t: selectedButtons){
+                yposs.add((int) t.getClientProperty("ypos"));
+            }
+            if(yposs.size()==0) return false;
+            Collections.sort(yposs);
+            for (int i = 0; i<yposs.size()-1; i++){
+                if(yposs.get(i) == yposs.get(i+1) - 1) positioned=true;
+                else{
+                    positioned=false;
+                    break;
+                }
+            }
+            return positioned;
+        }
+        if(pendiente==45 || pendiente==-45){
+            ArrayList<Integer> xposs = new ArrayList<Integer>();
+            ArrayList<Integer> yposs = new ArrayList<Integer>();
+            for(JButton t: selectedButtons){
+                xposs.add((int) t.getClientProperty("xpos"));
+                yposs.add((int) t.getClientProperty("ypos"));
+            }
+            if(yposs.size()==0 || xposs.size()==0) return false;
+            Collections.sort(xposs);
+            Collections.sort(yposs);
+            for (int i = 0; i<yposs.size()-1; i++){
+                if(yposs.get(i) == (yposs.get(i+1) - 1) && xposs.get(i) == (xposs.get(i+1) -1)) positioned=true;
+                else{
+                    positioned=false;
+                    break;
+                }
+            }
+            return positioned;
+        }
+        else{
+            return false;
         }
     }
 
