@@ -5,6 +5,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -36,6 +38,7 @@ public class Tablero extends JFrame {
     private JPanel controlpanel, categoriespanel, timePanel;
     private boolean gamestatus = false;
     private long startTime, endTime;
+    private Socket socketcon;
 
     public Tablero() throws IOException, ClassNotFoundException {
 
@@ -48,9 +51,27 @@ public class Tablero extends JFrame {
         this.setVisible(true);
         this.setTitle("Sopa de letras");
         this.setResizable(false);
-        this.setDefaultCloseOperation(EXIT_ON_CLOSE);
+        this.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+        this.addWindowListener(new WindowAdapter()
+        {
+            public void windowClosing(WindowEvent e)
+            {
+                dispose();
+                try {
+                    sendMessage("exit");
+                    oos.close();
+                    ois.close();
+                    socketcon.close();
+                } catch (IOException ioException) {
+                    ioException.printStackTrace();
+                }
+
+                System.exit(0); //calling the method is a must
+
+            }
+        });
         System.out.println("Iniciando el cliente");
-        Socket socketcon = new Socket(dir, port);
+        socketcon = new Socket(dir, port);
         System.out.println("Conexion establecida con el servidor");
         oos = new ObjectOutputStream(socketcon.getOutputStream());
         oos.flush();
@@ -301,6 +322,7 @@ public class Tablero extends JFrame {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
                 System.out.println("Iniciando juego");
+                restarStyles();
                 startGame();
             }
         });
@@ -361,8 +383,6 @@ public class Tablero extends JFrame {
         long totalTime = endTime - startTime;
         long minutes = (totalTime / 1000) / 60;
         comboCategories.setEnabled(!gamestatus);
-        // formula for conversion for
-        // miliseconds to seconds
         long seconds = (totalTime/ 1000) % 60;
         time.setText("Time: " + minutes + "min " + seconds + "s");
     }
