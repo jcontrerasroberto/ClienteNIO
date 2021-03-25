@@ -21,7 +21,7 @@ public class Tablero extends JFrame {
     private ObjectInputStream ois;
     private ObjectOutputStream oos;
     private int rows = 16, columns = 16;
-    private JLabel titulo;
+    private JLabel titulo, time;
     private JPanel table, info, words;
     private String[][] matrix = new String[rows][columns];
     private JButton[][] buttons = new JButton[rows][columns];
@@ -32,6 +32,10 @@ public class Tablero extends JFrame {
     private String tryWord;
     private ArrayList<JButton> selectedButtons  = new ArrayList<JButton>();
     private Integer pendienteok;
+    private JButton start, giveup;
+    private JPanel controlpanel, categoriespanel, timePanel;
+    private boolean gamestatus = false;
+    private long startTime, endTime;
 
     public Tablero() throws IOException, ClassNotFoundException {
 
@@ -73,7 +77,8 @@ public class Tablero extends JFrame {
                     @Override
                     public void actionPerformed(ActionEvent actionEvent) {
                         System.out.println(actionEvent.getActionCommand());
-                        JButton actioner = (JButton) actionEvent.getSource();
+                        if(!gamestatus) return;
+                         JButton actioner = (JButton) actionEvent.getSource();
                         if(!selectedButtons.contains(actioner)){
                             selectedButtons.add(actioner);
                             actioner.setBackground(Color.YELLOW);
@@ -92,6 +97,16 @@ public class Tablero extends JFrame {
                                 System.out.println("Encontraste la palabra :  " + word);
                                 disableButtons();
                                 markInPanel(word);
+                                //actualWords.get();
+                                int posInOrder = actualWords.indexOf(word.toLowerCase(Locale.ROOT));
+                                int posInDisorder = actualWords.indexOf(StringUtils.reverse(word.toLowerCase(Locale.ROOT)));
+                                if(posInOrder>=0) actualWords.remove(posInOrder);
+                                else{
+                                    actualWords.remove(posInDisorder);
+                                }
+                                if(actualWords.size()==0){
+                                    endGame();
+                                }
                             }
                         }
                     }
@@ -107,7 +122,6 @@ public class Tablero extends JFrame {
             if(tlabel.getText().equals(word.toUpperCase(Locale.ROOT)) || tlabel.getText().equals(StringUtils.reverse(word).toUpperCase(Locale.ROOT))) tlabel.setForeground(Color.RED);
         }
     }
-
 
     public void disableButtons(){
         for (int i = 0; i < selectedButtons.size(); i++){
@@ -249,6 +263,9 @@ public class Tablero extends JFrame {
 
     public void createInfo() throws IOException, ClassNotFoundException {
         info = new JPanel();
+        info.setLayout(new BoxLayout(info, BoxLayout.Y_AXIS));
+
+        categoriespanel = new JPanel();
         titulo = new JLabel("Categoria: ", SwingConstants.CENTER);
         comboCategories.setPreferredSize(new Dimension(180, 30));
         comboCategories.addItem("");
@@ -257,14 +274,16 @@ public class Tablero extends JFrame {
                 String itemSel = (String) comboCategories.getSelectedItem();
                 try {
                     if(!itemSel.equals(""))
+                        restarStyles();
                         changeCategory(itemSel);
                 } catch (IOException | ClassNotFoundException ioException) {
                     ioException.printStackTrace();
                 }
             }
         });
-        info.add(titulo);
-        info.add(comboCategories);
+        categoriespanel.add(titulo);
+        categoriespanel.add(comboCategories);
+
         words = new JPanel();
         words.setLayout(new GridLayout(15, 0));
         wordsLabel.clear();
@@ -273,9 +292,79 @@ public class Tablero extends JFrame {
             words.add(wordsLabel.get(i), SwingConstants.CENTER);
         }
 
+        controlpanel = new JPanel();
+        controlpanel.setLayout(new GridLayout(0, 2));
+        start = new JButton("START");
+        start.setBackground(Color.BLUE);
+        start.setForeground(Color.WHITE);
+        start.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent actionEvent) {
+                System.out.println("Iniciando juego");
+                startGame();
+            }
+        });
+        giveup = new JButton("GIVE UP");
+        giveup.setBackground(Color.RED);
+        giveup.setForeground(Color.WHITE);
+        giveup.setEnabled(gamestatus);
+        giveup.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent actionEvent) {
+                endGame();
+            }
+        });
+        controlpanel.add(start);
+        controlpanel.add(giveup);
+
+        timePanel = new JPanel();
+        time = new JLabel("Time: ");
+        timePanel.add(time);
+
+        info.add(categoriespanel);
         info.add(words);
+        info.add(controlpanel);
+        info.add(timePanel);
 
         info.setPreferredSize(new Dimension(320, 480));
+    }
+
+    public void restarStyles(){
+        for(int x=0; x<rows; x++){
+            for (int y=0; y<columns; y++){
+                buttons[x][y].setBackground(Color.WHITE);
+            }
+        }
+
+        for(JLabel t: wordsLabel){
+            t.setForeground(Color.BLACK);
+        }
+
+        time.setText("Time: ");
+    }
+
+    public void startGame(){
+        gamestatus = true;
+        startTime = System.currentTimeMillis();
+        giveup.setEnabled(gamestatus);
+        start.setEnabled(!gamestatus);
+        comboCategories.setEnabled(!gamestatus);
+    }
+
+    public void endGame(){
+        gamestatus = false;
+        endTime = System.currentTimeMillis();
+        giveup.setEnabled(gamestatus);
+        start.setEnabled(!gamestatus);
+        actualWords.clear();
+        selectedButtons.clear();
+        long totalTime = endTime - startTime;
+        long minutes = (totalTime / 1000) / 60;
+        comboCategories.setEnabled(!gamestatus);
+        // formula for conversion for
+        // miliseconds to seconds
+        long seconds = (totalTime/ 1000) % 60;
+        time.setText("Time: " + minutes + "min " + seconds + "s");
     }
 
     public void fillCategories() throws IOException, ClassNotFoundException {
