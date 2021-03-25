@@ -17,10 +17,11 @@ public class Tablero extends JFrame {
     private ObjectOutputStream oos;
     private int rows = 16, columns = 16;
     private JLabel titulo;
-    private JPanel table, info;
+    private JPanel table, info, words;
     private String[][] matrix = new String[rows][columns];
     private JButton[][] buttons = new JButton[rows][columns];
     private ArrayList<String> actualWords = new ArrayList<String>();
+    private ArrayList<JLabel> wordsLabel = new ArrayList<JLabel>();
     private JComboBox<String> comboCategories = new JComboBox<String>();
     private String category;
 
@@ -57,6 +58,12 @@ public class Tablero extends JFrame {
                 buttons[x][y].setMargin(new Insets(0,0,0,0));
                 buttons[x][y].setBackground(Color.WHITE);
                 buttons[x][y].setPreferredSize(new Dimension(30, 30));
+                buttons[x][y].addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent actionEvent) {
+                        System.out.println(actionEvent.getActionCommand());
+                    }
+                });
                 table.add(buttons[x][y]);
             }
         }
@@ -80,6 +87,16 @@ public class Tablero extends JFrame {
         });
         info.add(titulo);
         info.add(comboCategories);
+        words = new JPanel();
+        words.setLayout(new GridLayout(15, 0));
+        wordsLabel.clear();
+        for(int i=0; i<15; i++){
+            wordsLabel.add(new JLabel(""));
+            words.add(wordsLabel.get(i), SwingConstants.CENTER);
+        }
+
+        info.add(words);
+
         info.setPreferredSize(new Dimension(320, 480));
     }
 
@@ -112,15 +129,15 @@ public class Tablero extends JFrame {
         AlphabetSoup temp = (AlphabetSoup) ois.readObject();
         String[][] matrixrec = (String[][]) ois.readObject();
         String linealMat = ois.readUTF();
-        //String matrix2 = ois.readUTF();
         System.out.println(temp.getActualWords());
-        //System.out.println(matrix2);
         matrix = temp.getMatrix().clone();
-        //System.out.println(temp.getMatrix().clone().toString());
         printMatrix(matrixrec);
         System.out.println(linealMat);
         fillMatrix(linealMat);
+        actualWords.clear();
+        actualWords.addAll(temp.getActualWords());
         fillTablero();
+        displayWords();
     }
 
     public void fillMatrix(String lineal){
@@ -141,6 +158,15 @@ public class Tablero extends JFrame {
             System.out.println();
         }
         System.out.println();
+    }
+
+    public void displayWords(){
+        System.out.println("Llenando palabras");
+        int i = 0;
+        for (String word: actualWords) {
+            wordsLabel.get(i).setText(word.toUpperCase(Locale.ROOT));
+            i++;
+        }
     }
 
     public void sendMessage(String toSend) throws IOException {
