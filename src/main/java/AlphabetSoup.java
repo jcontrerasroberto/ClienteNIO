@@ -7,6 +7,7 @@ public class AlphabetSoup implements Serializable {
     private String[][] matrix = new String[rows][columns];
     private ArrayList<String> actualWords = new ArrayList<String>();
     private String category;
+    private String linealMat;
 
     public int getRows() {
         return rows;
@@ -46,5 +47,13 @@ public class AlphabetSoup implements Serializable {
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    public String getLinealMat() {
+        return linealMat;
+    }
+
+    public void setLinealMat(String linealMat) {
+        this.linealMat = linealMat;
     }
 }

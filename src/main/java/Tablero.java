@@ -7,21 +7,22 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Locale;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
+import java.util.*;
 
 public class Tablero extends JFrame {
 
     private final int port = 9876;
     private final String dir = "localhost";
-    private ObjectInputStream ois;
-    private ObjectOutputStream oos;
     private int rows = 16, columns = 16;
     private JLabel titulo, time;
     private JPanel table, info, words;
@@ -39,6 +40,7 @@ public class Tablero extends JFrame {
     private boolean gamestatus = false;
     private long startTime, endTime;
     private Socket socketcon;
+    private Selector sel;
 
     public Tablero() throws IOException, ClassNotFoundException {
 
@@ -52,32 +54,35 @@ public class Tablero extends JFrame {
         this.setTitle("Sopa de letras");
         this.setResizable(false);
         this.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
-        this.addWindowListener(new WindowAdapter()
-        {
-            public void windowClosing(WindowEvent e)
-            {
-                dispose();
-                try {
-                    sendMessage("exit");
-                    oos.close();
-                    ois.close();
-                    socketcon.close();
-                } catch (IOException ioException) {
-                    ioException.printStackTrace();
-                }
 
-                System.exit(0); //calling the method is a must
-
-            }
-        });
         System.out.println("Iniciando el cliente");
-        socketcon = new Socket(dir, port);
-        System.out.println("Conexion establecida con el servidor");
-        oos = new ObjectOutputStream(socketcon.getOutputStream());
-        oos.flush();
-        ois = new ObjectInputStream(socketcon.getInputStream());
-        fillCategories();
+        SocketChannel client = SocketChannel.open();
+        client.configureBlocking(false);
+        sel = Selector.open();
+        client.connect(new InetSocketAddress(dir, port));
+        client.register(sel, SelectionKey.OP_CONNECT);
 
+        while (true){
+            sel.select();
+            Iterator<SelectionKey> iterator = sel.selectedKeys().iterator();
+            while (iterator.hasNext()){
+                SelectionKey key = iterator.next();
+                iterator.remove();
+
+                if(key.isConnectable()){
+                    SocketChannel channel = (SocketChannel) key.channel();
+                    if(channel.isConnectionPending()){
+                        channel.finishConnect();
+                    }
+                    channel.register(sel, SelectionKey.OP_READ|SelectionKey.OP_WRITE);
+                    key.interestOps(SelectionKey.OP_WRITE);
+                    break;
+                }
+            }
+            break;
+        }
+
+        fillCategories();
     }
 
     public void createGrid(){
@@ -405,26 +410,91 @@ public class Tablero extends JFrame {
 
     public String[] getCategories() throws IOException, ClassNotFoundException {
         String[] categories = null;
-        sendMessage("getCategories");
-        categories = (String[]) ois.readObject();
-        return categories;
+        while (true){
+            sel.select();
+            Iterator<SelectionKey> iterator = sel.selectedKeys().iterator();
+            while (iterator.hasNext()){
+                SelectionKey key = iterator.next();
+                iterator.remove();
+
+                if(key.isWritable()){
+                    SocketChannel channel = (SocketChannel) key.channel();
+                    String action = "getCategories";
+                    ByteBuffer writer = ByteBuffer.wrap(action.getBytes());
+                    channel.write(writer);
+                    key.interestOps(SelectionKey.OP_READ);
+                    continue;
+                }else if(key.isReadable()){
+                    SocketChannel channel = (SocketChannel) key.channel();
+                    ByteBuffer reader = ByteBuffer.allocate(2000);
+                    reader.clear();
+                    int n = channel.read(reader);
+                    reader.flip();
+                    ObjectInputStream objectInputStream = new ObjectInputStream(new ByteArrayInputStream(reader.array()));
+                    categories = (String[]) objectInputStream.readObject();
+                    System.out.println(categories.length);
+                    key.interestOps(SelectionKey.OP_WRITE);
+                    return categories;
+                }
+            }
+        }
+        //sendMessage("getCategories");
+        //categories = (String[]) ois.readObject();
+
+        //return categories;
     }
 
-    private void changeCategory(String sel) throws IOException, ClassNotFoundException {
-        sendMessage("category:" + sel.toLowerCase(Locale.ROOT));
-        category = sel.toLowerCase(Locale.ROOT);
-        AlphabetSoup temp = (AlphabetSoup) ois.readObject();
-        String[][] matrixrec = (String[][]) ois.readObject();
-        String linealMat = ois.readUTF();
-        System.out.println(temp.getActualWords());
-        matrix = temp.getMatrix().clone();
+    private void changeCategory(String cat) throws IOException, ClassNotFoundException {
+        category = cat.toLowerCase(Locale.ROOT);
+        int cont = 0;
+        AlphabetSoup temp;
+        String[][] matrixrec;
+        String linealMat;
+        Object obj;
+        /*
         printMatrix(matrixrec);
         System.out.println(linealMat);
-        fillMatrix(linealMat);
-        actualWords.clear();
-        actualWords.addAll(temp.getActualWords());
-        fillTablero();
-        displayWords();
+
+        */
+        while (true){
+            sel.select();
+            Iterator<SelectionKey> iterator = sel.selectedKeys().iterator();
+            while (iterator.hasNext()){
+                SelectionKey key = iterator.next();
+                iterator.remove();
+
+                if(key.isWritable()){
+                    SocketChannel channel = (SocketChannel) key.channel();
+                    String action = "category:" + cat.toLowerCase(Locale.ROOT);
+                    ByteBuffer writer = ByteBuffer.wrap(action.getBytes());
+                    channel.write(writer);
+                    key.interestOps(SelectionKey.OP_READ);
+                    continue;
+                }else if(key.isReadable()){
+                        SocketChannel channel = (SocketChannel) key.channel();
+                        ByteBuffer reader = ByteBuffer.allocate(200000);
+                        reader.clear();
+                        int n = channel.read(reader);
+                        reader.flip();
+                        ObjectInputStream objectInputStream = new ObjectInputStream(new ByteArrayInputStream(reader.array()));
+                        obj = (Object) objectInputStream.readObject();
+                        if (obj instanceof AlphabetSoup){
+                            temp = (AlphabetSoup) obj;
+                            actualWords.clear();
+                            actualWords.addAll(temp.getActualWords());
+                            matrix = temp.getMatrix().clone();
+                            linealMat = temp.getLinealMat();
+                            fillMatrix(linealMat);
+                            fillTablero();
+                            displayWords();
+                            key.interestOps(SelectionKey.OP_WRITE);
+                            return;
+                        }
+                }
+            }
+        }
+
+
     }
 
     public void fillMatrix(String lineal){
@@ -454,11 +524,6 @@ public class Tablero extends JFrame {
             wordsLabel.get(i).setText(word.toUpperCase(Locale.ROOT));
             i++;
         }
-    }
-
-    public void sendMessage(String toSend) throws IOException {
-        oos.writeUTF(toSend);
-        oos.flush();
     }
 
 }
